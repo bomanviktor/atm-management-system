@@ -1,165 +1,238 @@
 #include "header.h"
 
-const char *RECORDS = "./data/records.txt";
+void saveAccount(struct Record r, struct Date d, sqlite3* db);
 
-int getAccountFromFile(FILE *ptr, char name[50], struct Record *r)
-{
-    return fscanf(ptr, "%d %d %s %d %d/%d/%d %s %d %lf %s",
-                  &r->id,
-		  &r->userId,
-		  name,
-                  &r->accountNbr,
-                  &r->deposit.month,
-                  &r->deposit.day,
-                  &r->deposit.year,
-                  r->country,
-                  &r->phone,
-                  &r->amount,
-                  r->accountType) != EOF;
-}
-
-void saveAccountToFile(FILE *ptr, struct User u, struct Record r)
-{
-    fprintf(ptr, "%d %d %s %d %d/%d/%d %s %d %.2lf %s\n\n",
-            &r->id,
-	    &u->id
-	    &u->name,
-            r.accountNbr,
-            r.deposit.month,
-            r.deposit.day,
-            r.deposit.year,
-            r.country,
-            r.phone,
-            r.amount,
-            r.accountType);
-}
-
-void stayOrReturn(int notGood, void f(struct User u), struct User u)
-{
-    int option;
-    if (notGood == 0)
-    {
-        system("clear");
-        printf("\n✖ Record not found!!\n");
-    invalid:
-        printf("\nEnter 0 to try again, 1 to return to main menu and 2 to exit:");
-        scanf("%d", &option);
-        if (option == 0)
-            f(u);
-        else if (option == 1)
-            mainMenu(u);
-        else if (option == 2)
-            exit(0);
-        else
-        {
-            printf("Insert a valid operation!\n");
-            goto invalid;
-        }
-    }
-    else
-    {
-        printf("\nEnter 1 to go to the main menu and 0 to exit:");
-        scanf("%d", &option);
-    }
-    if (option == 1)
-    {
-        system("clear");
-        mainMenu(u);
-    }
-    else
-    {
-        system("clear");
-        exit(1);
-    }
-}
-
-void success(struct User u)
-{
-    int option;
-    printf("\n✔ Success!\n\n");
-invalid:
-    printf("Enter 1 to go to the main menu and 0 to exit!\n");
-    scanf("%d", &option);
-    system("clear");
-    if (option == 1)
-    {
-        mainMenu(u);
-    }
-    else if (option == 0)
-    {
-        exit(1);
-    }
-    else
-    {
-        printf("Insert a valid operation!\n");
-        goto invalid;
-    }
-}
-
-void createNewAcc(struct User u)
-{
+void createNewAcc(struct User u, sqlite3* db) {
     struct Record r;
-    struct Record cr;
-    char userName[50];
-    FILE *pf = fopen(RECORDS, "a+");
+    struct Date d;
 
-noAccount:
     system("clear");
     printf("\t\t\t===== New record =====\n");
 
     printf("\nEnter today's date(mm/dd/yyyy):");
-    scanf("%d/%d/%d", &r.deposit.month, &r.deposit.day, &r.deposit.year);
+    scanf("%d/%d/%d", &d.month, &d.day, &d.year);
+
     printf("\nEnter the account number:");
     scanf("%d", &r.accountNbr);
 
-    while (getAccountFromFile(pf, userName, &cr))
-    {
-        if (strcmp(userName, u.name) == 0 && cr.accountNbr == r.accountNbr)
-        {
-            printf("✖ This Account already exists for this user\n\n");
-            goto noAccount;
-        }
-    }
     printf("\nEnter the country:");
-    scanf("%s", r.country);
+    scanf("%s", &r.country[100]);
+
     printf("\nEnter the phone number:");
     scanf("%d", &r.phone);
+
     printf("\nEnter amount to deposit: $");
     scanf("%lf", &r.amount);
-    printf("\nChoose the type of account:\n\t-> saving\n\t-> current\n\t-> fixed01(for 1 year)\n\t-> fixed02(for 2 years)\n\t-> fixed03(for 3 years)\n\n\tEnter your choice:");
-    scanf("%s", r.accountType);
 
-    saveAccountToFile(pf, u, r);
+    printf("\nChoose the type of account:\n\t"
+           "-> saving\n\t"
+           "-> current\n\t"
+           "-> fixed01(for 1 year)\n\t"
+           "-> fixed02(for 2 years)\n\t"
+           "-> fixed03(for 3 years)\n\n\t"
+           "Enter your choice:");
+    while (1 == 1) {
+        scanf("%s", r.accountType);
+        if (strcmp(r.accountType, "saving")) {
+            break;
+        }
+        if (strcmp(r.accountType, "current")) {
+            break;
+        }
+        if (strcmp(r.accountType, "fixed01")) {
+            break;
+        }
+        if (strcmp(r.accountType, "fixed02")) {
+            break;
+        }
+        if (strcmp(r.accountType, "fixed03")) {
+            break;
+        }
 
-    fclose(pf);
-    success(u);
+        printf("Invalid account type. \n");
+    }
+
+    r.userId = u.id;
+
+    saveAccount(r, d, db);
+    success(u, db);
 }
 
-void checkAllAccounts(struct User u)
-{
-    char userName[100];
-    struct Record r;
-
-    FILE *pf = fopen(RECORDS, "r");
-
+void updateAccount(struct User u, sqlite3 *db) {
     system("clear");
-    printf("\t\t====== All accounts from user, %s =====\n\n", u.name);
-    while (getAccountFromFile(pf, userName, &r))
-    {
-        if (strcmp(userName, u.name) == 0)
-        {
-            printf("_____________________\n");
-            printf("\nAccount number:%d\nDeposit Date:%d/%d/%d \ncountry:%s \nPhone number:%d \nAmount deposited: $%.2f \nType Of Account:%s\n",
-                   r.accountNbr,
-                   r.deposit.day,
-                   r.deposit.month,
-                   r.deposit.year,
-                   r.country,
-                   r.phone,
-                   r.amount,
-                   r.accountType);
+    printf("\tUPDATE ACCOUNT\n");
+
+    const char *tail;
+    sqlite3_stmt *stmt;
+
+    int result = CONTINUE;
+    int id;
+
+    while (result == CONTINUE) {
+        printf("\t\tEnter id: ");
+        scanf("%d", &id);
+        int count = 0;
+        char *select = "SELECT COUNT(*) FROM RECORDS WHERE id = ? AND user_id = ?";
+
+        int rc = sqlite3_prepare_v2(db, select, -1, &stmt, &tail);
+        if (rc != SQLITE_OK) {
+            fprintf(stderr, "Cannot prepare statement: %s\n", sqlite3_errmsg(db));
+            sqlite3_close(db);
+            return;
+        }
+
+        sqlite3_bind_int(stmt, 1, u.id);
+        sqlite3_bind_int(stmt, 2, id);
+
+        rc = sqlite3_step(stmt);
+        if (rc == SQLITE_ROW) {
+            count = sqlite3_column_int(stmt, 0);
+        }
+        if (count > 0) {
+            result = OK;
+        } else {
+            printf("Record with id %d does not exist.\n", id);
         }
     }
-    fclose(pf);
-    success(u);
+
+    system("clear");
+    result = CONTINUE;
+
+    while (result == CONTINUE) {
+        printf("\t Select field to update:\n");
+        printf("\t [1] Country\n");
+        printf("\t [2] Phone number\n");
+        printf("\t [0] Abort update\n");
+        int selection = 0;
+        scanf("%d", &selection);
+        switch (selection) {
+            case 0:
+                success(u, db);
+                return;
+            case 1:
+                result = updateCountry(u.id, db);
+                break;
+            case 2:
+                result = updatePhoneNum(u.id, db);
+                break;
+            default:
+                printf("\n Invalid selection.\n");
+                break;
+        }
+    }
+
 }
+
+void saveAccount(struct Record r, struct Date d, sqlite3* db) {
+    char formatDate[11];
+    sprintf(formatDate, "%02d/%02d/%04d", d.day, d.month, d.year);
+
+    const char *tail;
+    sqlite3_stmt *stmt;
+
+    char *insert = "INSERT INTO users VALUES(?, ?, ?, ?, ?, ?)";
+    int rc = sqlite3_prepare_v2(db, insert, -1, &stmt, &tail);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Cannot prepare statement: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return;
+    }
+    sqlite3_bind_int(stmt, 1, r.userId);
+    sqlite3_bind_text(stmt, 2, formatDate, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, r.country, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 4, r.phone);
+    sqlite3_bind_double(stmt, 5, r.amount);
+    sqlite3_bind_text(stmt, 6, r.accountType, -1, SQLITE_TRANSIENT);
+
+    rc = sqlite3_step(stmt);
+
+    if (rc != SQLITE_DONE) {
+        fprintf(stderr, "Failed to insert data: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        exit(1);
+    }
+
+    sqlite3_finalize(stmt);
+}
+
+
+
+void checkAllAccounts(struct User u, sqlite3 *db)
+{
+    displayAllAccounts(u, db);
+    success(u, db);
+}
+
+void checkExistingAccounts(struct User u, sqlite3 *db) {
+    const char *tail;
+    sqlite3_stmt *stmt;
+
+    char *select = "SELECT id, type FROM RECORDS WHERE user_id = ?";
+    int rc = sqlite3_prepare_v2(db, select, -1, &stmt, &tail);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Cannot prepare statement: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return;
+    }
+
+    rc = sqlite3_bind_int(stmt, 1, u.id);
+
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "Cannot bind id: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return;
+    }
+    system("clear");
+    printf("\t\t====== All accounts from user, %s =====\n\n", u.name);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int records_id = sqlite3_column_int(stmt, 1);
+        const unsigned char* type = sqlite3_column_text(stmt, 2);
+        printf("\tAccount id: %d, type: %s\n", records_id, type);
+    }
+
+    int id;
+    while (1) {
+        printf("\t0 to exit\n");
+        printf("\tEnter id: ");
+        scanf("%d",&id);
+
+        if (id == 0){
+            success(u, db);
+            return;
+        }
+
+        select = "SELECT type FROM RECORDS WHERE id = ?";
+        rc = sqlite3_prepare_v2(db, select, -1, &stmt, &tail);
+        if (rc != SQLITE_OK) {
+            fprintf(stderr, "Cannot prepare statement: %s\n", sqlite3_errmsg(db));
+            sqlite3_close(db);
+            return;
+        }
+
+        sqlite3_bind_int(stmt, 1, id);
+
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            const unsigned char* type = sqlite3_column_text(stmt, 1);
+            if (strcmp((const char*) type, "savings")) {
+                printf("\t\taccount %d -> savings: interest rate 7%%\n", id);
+            }
+            if (strcmp((const char*) type, "fixed01")) {
+                printf("\t\taccount %d -> fixed01(1 year account): interest rate 4%%\n", id);
+            }
+            if (strcmp((const char*) type, "fixed02")) {
+                printf("\t\taccount %d -> fixed02(2 year account): interest rate 5%%\n", id);
+            }
+            if (strcmp((const char*) type, "fixed03")) {
+                printf("\t\taccount %d -> fixed03(3 year account): interest rate 8%%\n", id);
+            } else {
+                printf("\t\taccount %d -> You will not get interests because the account is of type 'current'\n", id);
+            }
+        } else {
+            printf("Invalid account.\n");
+            exit(1);
+        }
+    }
+
+}
+

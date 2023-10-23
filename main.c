@@ -1,20 +1,6 @@
 #include "header.h"
 
-void mainMenu(struct User u) {
-
-    sqlite3 *db;
-    sqlite3_stmt *res;
-
-    int rc = sqlite3_open(":memory:", &db);
-
-    if (rc != SQLITE_OK) {
-
-        fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
-        sqlite3_close(db);
-
-        return 1;
-    }
-
+enum RESULT mainMenu(struct User u, sqlite3 *db) {
     int option;
     system("clear");
     printf("\n\n\t\t======= ATM =======\n\n");
@@ -32,145 +18,82 @@ void mainMenu(struct User u) {
     switch (option)
     {
     case 1:
-        createNewAcc(u);
+        createNewAcc(u, db);
         break;
     case 2:
-        updateAccount();
-        // student TODO : add your **Update account information** function
-        // here
+        updateAccount(u, db);
         break;
     case 3:
-        checkExistingAccounts();
-        // student TODO : add your **Check the details of existing accounts** function
-        // here
+        checkExistingAccounts(u, db);
         break;
     case 4:
-        checkAllAccounts(u);
+        checkAllAccounts(u, db);
         break;
     case 5:
-        makeTransaction();
-        // student TODO : add your **Make transaction** function
-        // here
+        makeTransaction(u, db);
         break;
     case 6:
-        removeExistingAccount();
-        // student TODO : add your **Remove existing account** function
-        // here
+        removeExistingAccount(u, db);
         break;
     case 7:
-        transferOwner();
-        // student TODO : add your **Transfer owner** function
-        // here
+        transferOwner(u, db);
         break;
     case 8:
         exit(1);
-        break;
     default:
         printf("Invalid operation!\n");
     }
-};
-
-void initMenu(struct User *u)
-{
-    int r = 0;
-    int option;
-    system("clear");
-    printf("\n\n\t\t======= ATM =======\n");
-    printf("\n\t\t-->> Feel free to login / register :\n");
-    printf("\n\t\t[1]- login\n");
-    printf("\n\t\t[2]- register\n");
-    printf("\n\t\t[3]- exit\n");
-    while (!r)
-    {
-        scanf("%d", &option);
-        switch (option)
-        {
-        case 1:
-            loginMenu(u->name, u->password);
-            if (strcmp(u->password, getPassword(*u)) == 0)
-            {
-                printf("\n\nPassword Match!");
-            }
-            else
-            {
-                printf("\nWrong password!! or User Name\n");
-                exit(1);
-            }
-            r = 1;
-            break;
-        case 2:
-            int result;
-            result = registration();
-
-            // student TODO : add your **Registration** function
-            // here
-            r = 1;
-            break;
-        case 3:
-            exit(1);
-            break;
-        default:
-            printf("Insert a valid operation!\n");
-        }
-    }
-};
-
-
-
-
-int init() {
-
-    sqlite3 *db;
-    char *err_msg = 0;
-
-    int rc = sqlite3_open(DB_PATH, &db);
-
-    if (rc != SQLITE_OK) {
-        fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
-        sqlite3_close(db);
-        return 1;
-    }
-
-
-    char *sql = "CREATE TABLE IF NOT EXISTS users"
-                "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                "name TEXT NOT NULL, "
-                "password TEXT NOT NULL);"
-                "DROP TABLE IF EXISTS records;"
-                "CREATE TABLE IF NOT EXISTS records"
-                "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                "user_id INTEGER, "
-                "date TEXT, "
-                "country TEXT, "
-                "phone_num INTEGER, "
-                "balance REAL, "
-                "type INTEGER, "
-                "FOREIGN KEY (user_id) REFERENCES users(id));";
-
-    rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
-
-    if (rc != SQLITE_OK) {
-        fprintf(stderr, "Failed to fetch data: %s\n", sqlite3_errmsg(db));
-        sqlite3_close(db);
-        return 1;
-    }
-
-    sqlite3_close(db);
-    return 0;
+    return OK;
 }
 
-int main() {
-    int result = init();
-    if (result == 0) {
+void initMenu(struct User *u, sqlite3 *db)
+{
+    enum RESULT result;
+    int option;
+    system("clear");
+
+    do {
+        printf("\n\n\t\t======= ATM =======\n");
+        printf("\n\t\t-->> Feel free to login / register :\n");
+        printf("\n\t\t[1]- login\n");
+        printf("\n\t\t[2]- register\n");
+        printf("\n\t\t[3]- exit\n");
+        scanf("%d", &option);
+
+        switch (option)
+        {
+            case 1:
+                result = loginMenu(db, u);
+                break;
+            case 2:
+                result = registerMenu(db);
+                break;
+            case 3:
+                exit(1);
+            default:
+                printf("Insert a valid operation!\n");
+        }
+
+        if (result == ERROR) {
+            printf("Unexpected error. Exit program.\n");
+            exit(1);
+        }
+    } while (result == CONTINUE);
+}
+
+int main(void) {
+    int result = initDb();
+    if (result == OK) {
         printf("Database created successfully.\n");
     } else {
         printf("Failed to create database.\n");
+        return ERROR;
     }
 
     struct User u;
-    
-    initMenu(&u);
-    mainMenu(u);
+    sqlite3 *db = openDb();
 
-    return 0;
+    initMenu(&u, db);
+    mainMenu(u, db);
+    return OK;
 }

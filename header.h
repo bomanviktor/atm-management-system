@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <sqlite3.h>
 
-const char *DB_PATH = "../data/database.db";
+enum RESULT {
+    OK,
+    ERROR,
+    CONTINUE
+};
 
 struct Date
 {
@@ -32,15 +37,37 @@ struct User
     char password[50];
 };
 
+// menu functions
+enum RESULT mainMenu(struct User u, sqlite3* db);
+
+// utils
+void goMainMenu(struct User u, sqlite3 *db);
+void success(struct User u, sqlite3 *db);
+void displayAllAccounts(struct User u, sqlite3 *db);
+
+
 // authentication functions
-void loginMenu(char a[50], char pass[50]);
-void registerMenu(char a[50], char pass[50]);
-const char *getPassword(struct User u);
+enum RESULT loginMenu(sqlite3 *db, struct User *u);
+enum RESULT registerMenu(sqlite3 *db);
+void validatePassword(struct User u);
+enum RESULT confirmation(void);
 
 // system function
-void createNewAcc(struct User u);
-void mainMenu(struct User u);
-void checkAllAccounts(struct User u);
+void createNewAcc(struct User u, sqlite3 *db);
+void checkExistingAccounts(struct User u, sqlite3 *db);
+void checkAllAccounts(struct User u, sqlite3 *db);
+void removeExistingAccount(struct User u, sqlite3 *db);
 
-// registration
-int registration();
+
+// update records
+void updateAccount(struct User u, sqlite3 *db);
+enum RESULT updatePhoneNum(int id, sqlite3 *db);
+enum RESULT updateCountry(int id, sqlite3 *db);
+void makeTransaction(struct User u, sqlite3 *db);
+void transferOwner(struct User u, sqlite3 *db);
+
+// Database
+
+enum RESULT initDb(void);
+sqlite3* openDb(void);
+
